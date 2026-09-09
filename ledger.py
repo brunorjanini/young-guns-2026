@@ -37,7 +37,6 @@ class CreditResult:
 class CreditLedger:
     def __init__(self, database_path: str):
         self._database_path = database_path
-        self._processed_event_ids: set[str] = set()
         with self._transaction() as conn:
             conn.executescript(SCHEMA)
 
@@ -55,11 +54,16 @@ class CreditLedger:
         event_id: str,
         account_id: str,
         amount_cents: int,
-    ) -> CreditResult:
-        if event_id in self._processed_event_ids:
-            return CreditResult(applied=False, balance_cents=self.balance(account_id))
-
+    ) -> CreditResult:        
         with self._transaction() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM applied_events WHERE event_id = ?",
+                (event_id,),
+            ).fetchone()
+
+            if row:
+                return CreditResult(applied=False, balance_cents=self.balance(account_id))    
+
             conn.execute(
                 "INSERT INTO applied_events (event_id, account_id, amount_cents)"
                 " VALUES (?, ?, ?)",
@@ -75,8 +79,6 @@ class CreditLedger:
                 " WHERE account_id = ?",
                 (amount_cents, account_id),
             )
-
-        self._processed_event_ids.add(event_id)
 
         return CreditResult(applied=True, balance_cents=self.balance(account_id))
 
