@@ -55,6 +55,15 @@ class CreditLedger:
         account_id: str,
         amount_cents: int,
     ) -> CreditResult:        
+        if not event_id:
+            raise InvalidCreditError("event_id cannot be empty")
+
+        if not account_id:
+            raise InvalidCreditError("account_id cannot be empty")
+
+        if amount_cents <= 0:
+            raise InvalidCreditError("amount_cents must be greater than zero")
+
         with self._transaction() as conn:
             cursor = conn.execute(
                 "INSERT OR IGNORE INTO applied_events (event_id, account_id, amount_cents)"
