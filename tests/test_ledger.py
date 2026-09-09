@@ -44,3 +44,56 @@ def test_duplicate_event_is_ignored_after_restart(database_path):
 
 def test_unknown_account_has_zero_balance(ledger):
     assert ledger.balance("acc-inexistente") == 0
+
+def test_same_event_concurrently_is_applied_once(ledger):
+    import threading
+
+    results = []
+
+    def apply():
+        result = ledger.apply_credit("evt-1", "acc-1", 1000)
+        results.append(result)
+
+    threads = [
+        threading.Thread(target=apply)
+        for _ in range(20)
+    ]
+
+    for thread in threads:
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    assert sum(result.applied for result in results) == 1
+    assert ledger.balance("acc-1") == 1000
+
+def test_same_event_concurrently_across_instances(database_path):
+    import threading
+    from ledger import CreditLedger
+
+    ledgers = [
+        CreditLedger(database_path)
+        for _ in range(20)
+    ]
+
+    results = []
+
+    def apply(ledger):
+        result = ledger.apply_credit("evt-1", "acc-1", 1000)
+        results.append(result)
+
+    threads = [
+        threading.Thread(target=apply, args=(ledger,))
+        for ledger in ledgers
+    ]
+
+    for thread in threads:
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    assert sum(result.applied for result in results) == 1
+    assert ledgers[0].balance("acc-1") == 1000
+

@@ -5,6 +5,7 @@ __pycache__/
 htmlcov/
 .venv/
 venv/
+young-guns/
 .env
 *.egg-info/
 dist/
