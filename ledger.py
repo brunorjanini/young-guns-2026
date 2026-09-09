@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS applied_events (
-    event_id     TEXT    NOT NULL,
+    event_id     TEXT    PRIMARY KEY,
     account_id   TEXT    NOT NULL,
     amount_cents INTEGER NOT NULL
 );
@@ -56,19 +56,18 @@ class CreditLedger:
         amount_cents: int,
     ) -> CreditResult:        
         with self._transaction() as conn:
-            row = conn.execute(
-                "SELECT 1 FROM applied_events WHERE event_id = ?",
-                (event_id,),
-            ).fetchone()
-
-            if row:
-                return CreditResult(applied=False, balance_cents=self.balance(account_id))    
-
-            conn.execute(
-                "INSERT INTO applied_events (event_id, account_id, amount_cents)"
+            cursor = conn.execute(
+                "INSERT OR IGNORE INTO applied_events (event_id, account_id, amount_cents)"
                 " VALUES (?, ?, ?)",
                 (event_id, account_id, amount_cents),
             )
+
+            if cursor.rowcount == 0:
+                return CreditResult(
+                    applied=False,
+                    balance_cents=self.balance(account_id),
+                )
+
             conn.execute(
                 "INSERT OR IGNORE INTO accounts (account_id, balance_cents)"
                 " VALUES (?, 0)",
